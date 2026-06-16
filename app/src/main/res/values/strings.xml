@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">AI Assist Lab</string>
+    <string name="accessibility_service_label">AI Assist Lab Automation</string>
+    <string name="accessibility_service_description">Runs approved research automation actions such as back, home, scroll, and text-focused clicks.</string>
+</resources>
