@@ -107,7 +107,7 @@ fun AssistApp(controller: AssistController) {
                 topBar = {
                     Column {
                         TopAppBar(
-                            title = { Text("AI Assist Lab") },
+                            title = { Text("Advanced AI assistant") },
                             actions = {
                                 TextButton(onClick = { showSettings = true }) {
                                     Text("Settings")
