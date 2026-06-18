@@ -25,6 +25,7 @@ class ToolRiskPolicyTest {
         assertEquals(ToolRisk.RequiresConfirmation, riskFor(ToolCall("summarizeVisibleScreen")))
         assertEquals(ToolRisk.RequiresConfirmation, riskFor(ToolCall("performAppMacro")))
         assertEquals(ToolRisk.RequiresConfirmation, riskFor(ToolCall("cancelScheduledAction")))
+        assertEquals(ToolRisk.RequiresConfirmation, riskFor(ToolCall("createDocument")))
     }
 
     private fun riskFor(call: ToolCall): ToolRisk = when (call.name) {

@@ -13,4 +13,5 @@ data class AppSettings(
     val modelPath: String = "",
     val api: ApiSettings = ApiSettings(),
     val autoApproveToolCalls: Boolean = false,
+    val monochromeUi: Boolean = false,
 )

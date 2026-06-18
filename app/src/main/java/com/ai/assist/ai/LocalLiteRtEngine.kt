@@ -1,6 +1,7 @@
 package com.ai.assist.ai
 
 import android.content.Context
+import com.ai.assist.domain.AppSettings
 import com.ai.assist.domain.ToolCall
 import java.io.File
 import java.lang.reflect.InvocationTargetException
@@ -67,6 +68,13 @@ class LocalLiteRtEngine(
     fun close() {
         session?.close()
         session = null
+    }
+
+    suspend fun generateText(prompt: String, settings: AppSettings): Result<String> = runCatching {
+        if (settings.modelPath.isBlank()) error("Local model path is empty.")
+        val modelFile = File(settings.modelPath)
+        if (!modelFile.exists() || !modelFile.canRead()) error("Local model is not readable: ${settings.modelPath}")
+        sessionFor(modelFile.absolutePath).send(prompt)
     }
 
     private suspend fun sessionFor(modelPath: String): LiteRtSession = withContext(Dispatchers.IO) {

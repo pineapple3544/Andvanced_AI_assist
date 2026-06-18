@@ -29,5 +29,9 @@ class PlanScheduler(private val context: Context) {
         plans.forEach { cancel(it.id) }
     }
 
+    fun rescheduleActivePlans(repository: PlanRepository = PlanRepository(context)) {
+        repository.activePlans().forEach { schedule(it) }
+    }
+
     private fun workName(planId: String): String = "plan-$planId"
 }

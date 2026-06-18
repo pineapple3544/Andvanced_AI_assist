@@ -17,7 +17,10 @@ class PlanWorker(
 
         repository.markRunning(planId)
         val result = ToolRouter(applicationContext).execute(plan.toolCall)
-        repository.markResult(planId, result.success, result.message)
+        val updated = repository.markRunResultAndReschedule(planId, result.success, result.message)
+        if (updated != null && updated.status == PlanStatus.Pending && updated.scheduleType != ScheduleType.Once) {
+            PlanScheduler(applicationContext).schedule(updated)
+        }
         return if (result.success) Result.success() else Result.failure()
     }
 

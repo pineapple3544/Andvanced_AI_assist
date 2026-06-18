@@ -42,17 +42,19 @@ class ToolRouter(
         "scheduleLaunch" -> {
             val nestedTool = call.arguments["toolName"]
             if (!nestedTool.isNullOrBlank()) {
-                val delay = call.arguments["delayMinutes"]?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L
                 val nestedCall = call.toNestedToolCall()
-                val plan = planRepository.addPlan("Run ${nestedCall.name}", nestedCall, delay)
+                val plan = planRepository.addScheduledPlan("Run ${nestedCall.name}", nestedCall, call.arguments)
                 planScheduler.schedule(plan)
-                ToolResult(true, "Added plan '${plan.title}' for $delay minute(s) from now. Plan id: ${plan.id}")
+                ToolResult(true, "Added plan '${plan.title}' (${plan.scheduleType}). Plan id: ${plan.id}")
             } else {
                 val query = call.arguments["appQuery"].orEmpty()
-                val delay = call.arguments["delayMinutes"]?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L
-                val plan = planRepository.addLaunchPlan(query, delay)
+                val plan = planRepository.addScheduledPlan(
+                    title = "Launch $query",
+                    toolCall = ToolCall("launchApp", mapOf("appQuery" to query), source = "plan"),
+                    args = call.arguments,
+                )
                 planScheduler.schedule(plan)
-                ToolResult(true, "Added plan '${plan.title}' for $delay minute(s) from now. Plan id: ${plan.id}")
+                ToolResult(true, "Added plan '${plan.title}' (${plan.scheduleType}). Plan id: ${plan.id}")
             }
         }
 
@@ -98,11 +100,25 @@ class ToolRouter(
             body = call.arguments["body"],
         )
 
+        "createDocument" -> ToolResult(false, "Document generation needs a mode selection in chat.")
+
         "summarizeVisibleScreen" -> accessibilityTool.summarizeVisibleScreen()
 
         "performAppMacro" -> accessibilityTool.runMacro(call.arguments["steps"].orEmpty())
 
-        "runAccessibilityAction" -> accessibilityTool.run(call.arguments)
+        "runAccessibilityAction" -> {
+            val action = call.arguments["action"].orEmpty()
+            if (action.isLikelyAppLaunchMisroute()) {
+                val result = appLauncher.launch(action)
+                if (result.success) {
+                    ToolResult(true, "Corrected accessibility action '$action' to app launch. ${result.message}")
+                } else {
+                    accessibilityTool.run(call.arguments)
+                }
+            } else {
+                accessibilityTool.run(call.arguments)
+            }
+        }
 
         else -> ToolResult(false, "Unknown tool: ${call.name}")
     }
@@ -117,9 +133,36 @@ class ToolRouter(
 
     private fun ToolCall.toNestedToolCall(): ToolCall {
         val nestedName = arguments["toolName"].orEmpty()
+        val scheduleKeys = setOf("toolName", "delayMinutes", "repeatIntervalMinutes", "dailyHour", "dailyMinute")
         val nestedArgs = arguments
-            .filterKeys { it != "toolName" && it != "delayMinutes" }
+            .filterKeys { it !in scheduleKeys }
             .mapKeys { (key, _) -> key.removePrefix("arg_") }
         return ToolCall(nestedName, nestedArgs, source = source)
+    }
+
+    private fun String.isLikelyAppLaunchMisroute(): Boolean {
+        val normalized = trim()
+        if (normalized.isBlank()) return false
+        val supportedAccessibilityActions = setOf("back", "home", "scrollForward", "clickText", "inputText")
+        return normalized !in supportedAccessibilityActions
+    }
+
+    private fun PlanRepository.addScheduledPlan(
+        title: String,
+        toolCall: ToolCall,
+        args: Map<String, String>,
+    ) = when {
+        args["repeatIntervalMinutes"]?.toLongOrNull() != null ->
+            addIntervalPlan(title, toolCall, args["repeatIntervalMinutes"]!!.toLong())
+
+        args["dailyHour"]?.toIntOrNull() != null ->
+            addDailyPlan(
+                title,
+                toolCall,
+                args["dailyHour"]!!.toInt(),
+                args["dailyMinute"]?.toIntOrNull() ?: 0,
+            )
+
+        else -> addPlan(title, toolCall, args["delayMinutes"]?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L)
     }
 }

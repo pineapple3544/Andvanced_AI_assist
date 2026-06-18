@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
             DisposableEffect(Unit) {
                 onDispose { controller.close() }
             }
-            AI_assistTheme {
+            AI_assistTheme(monochrome = controller.settings.monochromeUi) {
                 AssistApp(controller = controller)
             }
         }

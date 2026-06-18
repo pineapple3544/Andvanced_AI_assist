@@ -22,12 +22,56 @@ class PlanRepository(context: Context) {
     }
 
     fun addPlan(title: String, toolCall: ToolCall, delayMinutes: Long): PlanItem {
+        return addPlan(
+            title = title,
+            toolCall = toolCall,
+            scheduledAtMillis = System.currentTimeMillis() + delayMinutes.coerceAtLeast(1L) * 60_000L,
+            scheduleType = ScheduleType.Once,
+        )
+    }
+
+    fun addIntervalPlan(title: String, toolCall: ToolCall, repeatIntervalMinutes: Long): PlanItem {
+        val now = System.currentTimeMillis()
+        return addPlan(
+            title = title,
+            toolCall = toolCall,
+            scheduledAtMillis = PlanScheduleCalculator.nextIntervalTime(now, repeatIntervalMinutes),
+            scheduleType = ScheduleType.Interval,
+            repeatIntervalMinutes = repeatIntervalMinutes.coerceAtLeast(1L),
+        )
+    }
+
+    fun addDailyPlan(title: String, toolCall: ToolCall, hour: Int, minute: Int): PlanItem {
+        val now = System.currentTimeMillis()
+        return addPlan(
+            title = title,
+            toolCall = toolCall,
+            scheduledAtMillis = PlanScheduleCalculator.nextDailyTime(now, hour, minute),
+            scheduleType = ScheduleType.Daily,
+            dailyHour = hour.coerceIn(0, 23),
+            dailyMinute = minute.coerceIn(0, 59),
+        )
+    }
+
+    private fun addPlan(
+        title: String,
+        toolCall: ToolCall,
+        scheduledAtMillis: Long,
+        scheduleType: ScheduleType,
+        repeatIntervalMinutes: Long? = null,
+        dailyHour: Int? = null,
+        dailyMinute: Int? = null,
+    ): PlanItem {
         val now = System.currentTimeMillis()
         val plan = PlanItem(
             id = UUID.randomUUID().toString(),
             title = title.ifBlank { toolCall.name },
             toolCall = toolCall.copy(source = "plan"),
-            scheduledAtMillis = now + delayMinutes.coerceAtLeast(1L) * 60_000L,
+            scheduledAtMillis = scheduledAtMillis,
+            scheduleType = scheduleType,
+            repeatIntervalMinutes = repeatIntervalMinutes,
+            dailyHour = dailyHour,
+            dailyMinute = dailyMinute,
             status = PlanStatus.Pending,
             createdAtMillis = now,
         )
@@ -57,6 +101,31 @@ class PlanRepository(context: Context) {
             )
         }
     }
+
+    fun markRunResultAndReschedule(id: String, success: Boolean, message: String): PlanItem? {
+        val plan = get(id) ?: return null
+        val now = System.currentTimeMillis()
+        val nextTime = PlanScheduleCalculator.nextTimeAfterRun(plan, now)
+        val updated = if (nextTime == null) {
+            plan.copy(
+                status = if (success) PlanStatus.Succeeded else PlanStatus.Failed,
+                lastRunAtMillis = now,
+                lastResult = message,
+            )
+        } else {
+            plan.copy(
+                status = PlanStatus.Pending,
+                scheduledAtMillis = nextTime,
+                lastRunAtMillis = now,
+                lastResult = message,
+            )
+        }
+        upsert(updated)
+        return updated
+    }
+
+    fun activePlans(): List<PlanItem> =
+        list().filter { it.status == PlanStatus.Pending }
 
     fun cancel(id: String) {
         get(id)?.let { upsert(it.copy(status = PlanStatus.Canceled, lastResult = "Canceled by user.")) }

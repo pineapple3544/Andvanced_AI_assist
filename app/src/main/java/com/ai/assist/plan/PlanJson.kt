@@ -31,6 +31,10 @@ object PlanJson {
             .put("toolSource", toolCall.source)
             .put("arguments", args)
             .put("scheduledAtMillis", scheduledAtMillis)
+            .put("scheduleType", scheduleType.name)
+            .put("repeatIntervalMinutes", repeatIntervalMinutes ?: JSONObject.NULL)
+            .put("dailyHour", dailyHour ?: JSONObject.NULL)
+            .put("dailyMinute", dailyMinute ?: JSONObject.NULL)
             .put("status", status.name)
             .put("createdAtMillis", createdAtMillis)
             .put("lastRunAtMillis", lastRunAtMillis ?: JSONObject.NULL)
@@ -51,6 +55,11 @@ object PlanJson {
                 source = optString("toolSource", "plan"),
             ),
             scheduledAtMillis = getLong("scheduledAtMillis"),
+            scheduleType = runCatching { ScheduleType.valueOf(optString("scheduleType", ScheduleType.Once.name)) }
+                .getOrDefault(ScheduleType.Once),
+            repeatIntervalMinutes = if (isNull("repeatIntervalMinutes")) null else getLong("repeatIntervalMinutes"),
+            dailyHour = if (isNull("dailyHour")) null else getInt("dailyHour"),
+            dailyMinute = if (isNull("dailyMinute")) null else getInt("dailyMinute"),
             status = runCatching { PlanStatus.valueOf(getString("status")) }.getOrDefault(PlanStatus.Pending),
             createdAtMillis = getLong("createdAtMillis"),
             lastRunAtMillis = if (isNull("lastRunAtMillis")) null else getLong("lastRunAtMillis"),

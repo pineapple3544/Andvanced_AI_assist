@@ -13,7 +13,7 @@ class ToolIntentPlannerTest {
 
         assertNotNull(call)
         assertEquals("launchApp", call?.name)
-        assertEquals("Settings", call?.arguments?.get("appQuery"))
+        assertEquals("settings", call?.arguments?.get("appQuery"))
     }
 
     @Test

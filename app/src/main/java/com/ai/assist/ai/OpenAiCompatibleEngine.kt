@@ -1,5 +1,6 @@
 package com.ai.assist.ai
 
+import com.ai.assist.domain.AppSettings
 import com.ai.assist.domain.ToolCall
 import java.io.BufferedReader
 import java.io.OutputStreamWriter
@@ -37,7 +38,22 @@ class OpenAiCompatibleEngine(
         emit(AiEvent.Done)
     }
 
-    private suspend fun callApi(request: GenerateRequest): String = withContext(Dispatchers.IO) {
+    suspend fun completeText(
+        settings: AppSettings,
+        systemPrompt: String,
+        prompt: String,
+    ): String {
+        if (settings.api.apiKey.isBlank()) error("API key is empty. Add an OpenAI-compatible API key in Settings.")
+        return callApi(
+            request = GenerateRequest(prompt, settings, availableTools = ""),
+            systemPrompt = systemPrompt,
+        )
+    }
+
+    private suspend fun callApi(
+        request: GenerateRequest,
+        systemPrompt: String = SYSTEM_PROMPT,
+    ): String = withContext(Dispatchers.IO) {
         val endpoint = request.settings.api.baseUrl.trimEnd('/') + "/chat/completions"
         val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -54,7 +70,7 @@ class OpenAiCompatibleEngine(
             .put(
                 "messages",
                 JSONArray()
-                    .put(JSONObject().put("role", "system").put("content", SYSTEM_PROMPT))
+                    .put(JSONObject().put("role", "system").put("content", systemPrompt))
                     .put(JSONObject().put("role", "user").put("content", request.prompt)),
             )
         OutputStreamWriter(connection.outputStream).use { it.write(body.toString()) }
@@ -88,6 +104,6 @@ class OpenAiCompatibleEngine(
 
     private companion object {
         const val SYSTEM_PROMPT =
-            "You are a mobile AI assistant planner. If an Android tool should run, answer with compact JSON like {\"tool\":\"launchApp\",\"arguments\":{\"appQuery\":\"Settings\"}}. Valid tools: listInstalledApps, launchApp, addCalendarEvent, composeEmail, summarizeVisibleScreen, performAppMacro, scheduleLaunch, cancelScheduledAction, getDeviceCapability, openFile, runAccessibilityAction. Do not use search tools from normal chat; search is handled by the app's explicit Search button. Otherwise answer normally."
+            "You are a mobile AI assistant planner. If an Android tool should run, answer with compact JSON like {\"tool\":\"launchApp\",\"arguments\":{\"appQuery\":\"Settings\"}}. Valid tools: listInstalledApps, launchApp, addCalendarEvent, composeEmail, createDocument, summarizeVisibleScreen, performAppMacro, scheduleLaunch, cancelScheduledAction, getDeviceCapability, openFile, runAccessibilityAction. For document requests like making a PPT/PDF template, use createDocument with topic, format pptx/pdf, style, and slideCount. For schedules, scheduleLaunch supports delayMinutes, repeatIntervalMinutes, or dailyHour/dailyMinute. Do not use search tools from normal chat; search is handled by the app's explicit Search button. Otherwise answer normally."
     }
 }

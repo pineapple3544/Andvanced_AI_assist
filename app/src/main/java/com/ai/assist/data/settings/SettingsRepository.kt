@@ -20,6 +20,7 @@ class SettingsRepository(context: Context) {
             maxTokens = prefs.getInt("api_max_tokens", ApiSettings().maxTokens),
         ),
         autoApproveToolCalls = prefs.getBoolean("auto_approve_tool_calls", false),
+        monochromeUi = prefs.getBoolean("monochrome_ui", false),
     )
 
     fun save(settings: AppSettings) {
@@ -32,6 +33,7 @@ class SettingsRepository(context: Context) {
             .putFloat("api_temperature", settings.api.temperature)
             .putInt("api_max_tokens", settings.api.maxTokens)
             .putBoolean("auto_approve_tool_calls", settings.autoApproveToolCalls)
+            .putBoolean("monochrome_ui", settings.monochromeUi)
             .apply()
     }
 }

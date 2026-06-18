@@ -12,6 +12,7 @@ class PlanJsonTest {
             title = "Launch Settings",
             toolCall = ToolCall("launchApp", mapOf("appQuery" to "Settings"), "plan"),
             scheduledAtMillis = 1000L,
+            scheduleType = ScheduleType.Once,
             status = PlanStatus.Pending,
             createdAtMillis = 500L,
         )
@@ -28,6 +29,8 @@ class PlanJsonTest {
             title = "Search",
             toolCall = ToolCall("searchWeb", mapOf("query" to "Android LiteRT"), "plan"),
             scheduledAtMillis = 2000L,
+            scheduleType = ScheduleType.Interval,
+            repeatIntervalMinutes = 10L,
             status = PlanStatus.Pending,
             createdAtMillis = 1000L,
         )
@@ -36,5 +39,7 @@ class PlanJsonTest {
 
         assertEquals("searchWeb", decoded.single().toolCall.name)
         assertEquals("Android LiteRT", decoded.single().toolCall.arguments["query"])
+        assertEquals(ScheduleType.Interval, decoded.single().scheduleType)
+        assertEquals(10L, decoded.single().repeatIntervalMinutes)
     }
 }

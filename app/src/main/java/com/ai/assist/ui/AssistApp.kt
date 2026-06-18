@@ -1,5 +1,21 @@
 package com.ai.assist.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -60,51 +76,79 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
 fun AssistApp(controller: AssistController) {
     var showSettings by remember { mutableStateOf(false) }
     var selectedHome by remember { mutableStateOf(HomeLocation.Chat) }
 
-    if (showSettings) {
-        SettingsScreen(controller = controller, onBack = { showSettings = false })
-        return
-    }
-
-    Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .imePadding(),
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = { Text("AI Assist Lab") },
-                    actions = {
-                        TextButton(onClick = { showSettings = true }) {
-                            Text("Settings")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-                )
-                HomeLocationBar(selectedHome, onSelected = {
-                    selectedHome = it
-                    if (it == HomeLocation.Plan) controller.refreshPlans()
-                })
+    AnimatedContent(
+        targetState = showSettings,
+        modifier = Modifier.fillMaxSize(),
+        transitionSpec = {
+            if (targetState) {
+                (slideInHorizontally(animationSpec = tween(260)) { it / 3 } + fadeIn(tween(220)))
+                    .togetherWith(slideOutHorizontally(animationSpec = tween(220)) { -it / 5 } + fadeOut(tween(180)))
+            } else {
+                (slideInHorizontally(animationSpec = tween(260)) { -it / 3 } + fadeIn(tween(220)))
+                    .togetherWith(slideOutHorizontally(animationSpec = tween(220)) { it / 5 } + fadeOut(tween(180)))
             }
         },
-        bottomBar = {
-            if (selectedHome == HomeLocation.Chat) ChatInput(controller)
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            when (selectedHome) {
-                HomeLocation.Chat -> ChatPanel(controller)
-                HomeLocation.Plan -> PlanPanel(controller)
+        label = "settingsTransition",
+    ) { settingsVisible ->
+        if (settingsVisible) {
+            SettingsScreen(controller = controller, onBack = { showSettings = false })
+        } else {
+            Scaffold(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .imePadding(),
+                topBar = {
+                    Column {
+                        TopAppBar(
+                            title = { Text("AI Assist Lab") },
+                            actions = {
+                                TextButton(onClick = { showSettings = true }) {
+                                    Text("Settings")
+                                }
+                            },
+                            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                        )
+                        HomeLocationBar(selectedHome, onSelected = {
+                            selectedHome = it
+                            if (it == HomeLocation.Plan) controller.refreshPlans()
+                        })
+                    }
+                },
+                bottomBar = {
+                    AnimatedVisibility(
+                        visible = selectedHome == HomeLocation.Chat,
+                        enter = slideInVertically(tween(180)) { it / 2 } + fadeIn(tween(180)),
+                        exit = slideOutVertically(tween(160)) { it / 2 } + fadeOut(tween(140)),
+                    ) {
+                        ChatInput(controller)
+                    }
+                },
+            ) { padding ->
+                AnimatedContent(
+                    targetState = selectedHome,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    transitionSpec = {
+                        val direction = if (targetState == HomeLocation.Plan) 1 else -1
+                        (slideInHorizontally(tween(240)) { direction * it / 4 } + fadeIn(tween(180)))
+                            .togetherWith(slideOutHorizontally(tween(210)) { -direction * it / 5 } + fadeOut(tween(160)))
+                            .using(SizeTransform(clip = false))
+                    },
+                    label = "homeLocationTransition",
+                ) { location ->
+                    when (location) {
+                        HomeLocation.Chat -> ChatPanel(controller)
+                        HomeLocation.Plan -> PlanPanel(controller)
+                    }
+                }
             }
         }
     }
@@ -114,6 +158,16 @@ private enum class HomeLocation {
     Chat,
     Plan,
 }
+
+private fun cardEnterTransition(): EnterTransition =
+    expandVertically(animationSpec = tween(190), expandFrom = Alignment.Top) +
+        slideInVertically(animationSpec = tween(190)) { -it / 4 } +
+        fadeIn(animationSpec = tween(180))
+
+private fun cardExitTransition(): ExitTransition =
+    shrinkVertically(animationSpec = tween(160), shrinkTowards = Alignment.Top) +
+        slideOutVertically(animationSpec = tween(160)) { -it / 5 } +
+        fadeOut(animationSpec = tween(140))
 
 @Composable
 private fun HomeLocationBar(selected: HomeLocation, onSelected: (HomeLocation) -> Unit) {
@@ -150,7 +204,20 @@ private fun ChatPanel(controller: AssistController) {
         }
     }
     Column(modifier = Modifier.fillMaxSize()) {
-        PendingTool(controller)
+        AnimatedVisibility(
+            visible = controller.pendingDocumentRequest != null,
+            enter = cardEnterTransition(),
+            exit = cardExitTransition(),
+        ) {
+            PendingDocument(controller)
+        }
+        AnimatedVisibility(
+            visible = controller.pendingToolCall != null,
+            enter = cardEnterTransition(),
+            exit = cardExitTransition(),
+        ) {
+            PendingTool(controller)
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -159,9 +226,76 @@ private fun ChatPanel(controller: AssistController) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(controller.messages, key = { it.id }) { message ->
-                MessageRow(message)
+                AnimatedVisibility(
+                    visible = true,
+                    enter = slideInVertically(tween(220)) { it / 3 } + fadeIn(tween(220)),
+                    exit = fadeOut(tween(120)),
+                    modifier = Modifier.animateItem(),
+                ) {
+                    MessageRow(message, monochrome = controller.settings.monochromeUi)
+                }
             }
             item { Spacer(Modifier.height(12.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun PendingDocument(controller: AssistController) {
+    val pending = controller.pendingDocumentRequest ?: return
+    Surface(
+        tonalElevation = 2.dp,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Document generation", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text(pending.summary, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Saved to app Documents/generated, then opened with Android resolver.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                TextButton(onClick = controller::rejectPendingDocument) { Text("Cancel") }
+            }
+            DocumentModeButton(
+                title = "Local only",
+                description = "Best privacy. Stays on the phone, but writing quality can be limited.",
+                onClick = { controller.generatePendingDocument(AiMode.Local) },
+                enabled = !controller.isGenerating,
+            )
+            DocumentModeButton(
+                title = "Local + API",
+                description = "Balanced. Local seed with API polish; needs API key and network.",
+                onClick = { controller.generatePendingDocument(AiMode.Hybrid) },
+                enabled = !controller.isGenerating,
+            )
+            DocumentModeButton(
+                title = "API only",
+                description = "Best quality for longer decks. Sends the topic to your configured API.",
+                onClick = { controller.generatePendingDocument(AiMode.ApiOnly) },
+                enabled = !controller.isGenerating,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DocumentModeButton(
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+    enabled: Boolean,
+) {
+    OutlinedButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, fontWeight = FontWeight.SemiBold)
+            Text(description, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -190,12 +324,28 @@ private fun PendingTool(controller: AssistController) {
 }
 
 @Composable
-private fun MessageRow(message: ChatMessage) {
-    val color = when (message.role) {
-        ChatRole.User -> MaterialTheme.colorScheme.primaryContainer
-        ChatRole.Assistant -> MaterialTheme.colorScheme.surfaceVariant
-        ChatRole.Tool -> Color(0xFFE4F5FA)
-        ChatRole.System -> Color(0xFFF4F0E8)
+private fun MessageRow(message: ChatMessage, monochrome: Boolean) {
+    val collapsible = message.isCollapsibleLog()
+    var expanded by remember(message.id) { mutableStateOf(!collapsible) }
+    val color = if (monochrome) {
+        when (message.role) {
+            ChatRole.User -> Color.Black
+            ChatRole.Assistant -> Color(0xFFF4F4F4)
+            ChatRole.Tool -> Color(0xFFE6E6E6)
+            ChatRole.System -> Color.White
+        }
+    } else {
+        when (message.role) {
+            ChatRole.User -> MaterialTheme.colorScheme.primaryContainer
+            ChatRole.Assistant -> MaterialTheme.colorScheme.surfaceVariant
+            ChatRole.Tool -> Color(0xFFE4F5FA)
+            ChatRole.System -> Color(0xFFF4F0E8)
+        }
+    }
+    val contentColor = if (monochrome && message.role == ChatRole.User) {
+        Color.White
+    } else {
+        MaterialTheme.colorScheme.onSurface
     }
     val label = when (message.role) {
         ChatRole.User -> "You"
@@ -203,12 +353,55 @@ private fun MessageRow(message: ChatMessage) {
         ChatRole.Tool -> "Tool"
         ChatRole.System -> "System"
     }
-    Surface(shape = RoundedCornerShape(8.dp), color = color, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(8.dp), color = color, contentColor = contentColor, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-            Text(message.text, style = MaterialTheme.typography.bodyMedium)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                if (collapsible) {
+                    TextButton(onClick = { expanded = !expanded }) {
+                        Text(if (expanded) "v" else ">")
+                    }
+                }
+            }
+            if (collapsible) {
+                Text(message.collapsedSummary(), style = MaterialTheme.typography.bodyMedium)
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = expandVertically(tween(180)) + fadeIn(tween(160)),
+                    exit = shrinkVertically(tween(150)) + fadeOut(tween(120)),
+                ) {
+                    Column(modifier = Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        HorizontalDivider(color = DividerDefaults.color)
+                        Text(message.text, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            } else {
+                Text(message.text, style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
+}
+
+private fun ChatMessage.isCollapsibleLog(): Boolean {
+    if (role == ChatRole.User) return false
+    if (role == ChatRole.Assistant) return text.startsWith("Proposed tool call:")
+    if (role == ChatRole.System) return true
+    if (role == ChatRole.Tool) return !isVisibleCompletion()
+    return false
+}
+
+private fun ChatMessage.isVisibleCompletion(): Boolean =
+    text.startsWith("Tool ok:") ||
+        text.startsWith("Tool failed:") ||
+        text.startsWith("Plan ok:") ||
+        text.startsWith("Plan failed:") ||
+        text.startsWith("Document created")
+
+private fun ChatMessage.collapsedSummary(): String = when {
+    text.startsWith("Proposed tool call:") -> "Tool call proposed"
+    role == ChatRole.System -> text.lineSequence().firstOrNull().orEmpty().ifBlank { "System message" }
+    role == ChatRole.Tool -> text.lineSequence().firstOrNull().orEmpty().ifBlank { "Tool log" }
+    else -> text.lineSequence().firstOrNull().orEmpty()
 }
 
 @Composable
@@ -216,7 +409,11 @@ private fun ChatInput(controller: AssistController) {
     var showActions by remember { mutableStateOf(false) }
     Surface(tonalElevation = 3.dp) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            if (showActions) {
+            AnimatedVisibility(
+                visible = showActions,
+                enter = expandVertically(tween(180)) + fadeIn(tween(160)),
+                exit = shrinkVertically(tween(150)) + fadeOut(tween(120)),
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -252,8 +449,8 @@ private fun ChatInput(controller: AssistController) {
                     maxLines = 4,
                     placeholder = { Text("Ask AI Assist to open apps, files, or run mobile MCP tools") },
                 )
-                Button(onClick = controller::sendCurrentInput, enabled = !controller.isGenerating) {
-                    Text(if (controller.isGenerating) "..." else "Send")
+                Button(onClick = controller::submitOrCancel, enabled = controller.sendButtonEnabled()) {
+                    Text(if (controller.isGenerating) "Stop" else "Send")
                 }
             }
         }
@@ -298,12 +495,21 @@ private fun PlanPanel(controller: AssistController) {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(controller.plans, key = { it.id }) { plan ->
-                    PlanRow(
+                    AnimatedVisibility(
+                        visible = true,
+                        enter = slideInVertically(tween(220)) { it / 4 } + fadeIn(tween(220)),
+                        exit = fadeOut(tween(120)),
+                        modifier = Modifier.animateItem(),
+                    ) {
+                        PlanRow(
                         plan = plan,
+                        scheduleLabel = controller.planScheduleLabel(plan),
+                        monochrome = controller.settings.monochromeUi,
                         onRunNow = { controller.runPlanNow(plan) },
-                        onCancel = { controller.cancelPlan(plan) },
-                        onDelete = { controller.deletePlan(plan) },
-                    )
+                            onCancel = { controller.cancelPlan(plan) },
+                            onDelete = { controller.deletePlan(plan) },
+                        )
+                    }
                 }
                 item { Spacer(Modifier.height(12.dp)) }
             }
@@ -314,6 +520,8 @@ private fun PlanPanel(controller: AssistController) {
 @Composable
 private fun PlanRow(
     plan: PlanItem,
+    scheduleLabel: String,
+    monochrome: Boolean,
     onRunNow: () -> Unit,
     onCancel: () -> Unit,
     onDelete: () -> Unit,
@@ -322,8 +530,9 @@ private fun PlanRow(
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(plan.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                PlanStatusChip(plan.status)
+                PlanStatusChip(plan.status, monochrome)
             }
+            Text("Repeat: $scheduleLabel", style = MaterialTheme.typography.bodyMedium)
             Text("When: ${formatPlanTime(plan.scheduledAtMillis)}", style = MaterialTheme.typography.bodyMedium)
             Text("Tool: ${plan.toolCall.summary}", style = MaterialTheme.typography.bodyMedium)
             plan.lastResult?.let {
@@ -354,10 +563,20 @@ private fun formatPlanTime(millis: Long): String =
     SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(millis))
 
 @Composable
-private fun PlanStatusChip(status: PlanStatus) {
+private fun PlanStatusChip(status: PlanStatus, monochrome: Boolean) {
     val positive = status == PlanStatus.Pending || status == PlanStatus.Succeeded
-    val background = if (positive) Color(0xFFE0F2E9) else Color(0xFFFFE2DC)
-    val foreground = if (positive) Color(0xFF155C36) else Color(0xFF8A1C0A)
+    val background = when {
+        monochrome && positive -> Color.Black
+        monochrome -> Color.White
+        positive -> Color(0xFFE0F2E9)
+        else -> Color(0xFFFFE2DC)
+    }
+    val foreground = when {
+        monochrome && positive -> Color.White
+        monochrome -> Color.Black
+        positive -> Color(0xFF155C36)
+        else -> Color(0xFF8A1C0A)
+    }
     Surface(shape = RoundedCornerShape(8.dp), color = background) {
         Text(
             text = status.name,
@@ -393,6 +612,8 @@ private fun SettingsScreen(controller: AssistController, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             ModeSection(controller)
+            SettingsDivider()
+            DisplaySection(controller)
             SettingsDivider()
             ModelSection(controller)
             SettingsDivider()
@@ -432,6 +653,30 @@ private fun ApprovalSection(controller: AssistController) {
 }
 
 @Composable
+private fun DisplaySection(controller: AssistController) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Display", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Monochrome high contrast UI", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Uses black, white, and gray surfaces so text stays readable on grayscale screens.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Switch(
+                checked = controller.settings.monochromeUi,
+                onCheckedChange = controller::setMonochromeUi,
+            )
+        }
+    }
+}
+
+@Composable
 private fun ModeSection(controller: AssistController) {
     var sliderValue by remember(controller.settings.aiMode) {
         mutableFloatStateOf(controller.settings.aiMode.sliderPosition)
@@ -439,8 +684,9 @@ private fun ModeSection(controller: AssistController) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Mode", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("보안", style = MaterialTheme.typography.labelLarge, color = Color(0xFF155C36))
-            Text("성능", style = MaterialTheme.typography.labelLarge, color = Color(0xFF7A3E00))
+            val labelColor = if (controller.settings.monochromeUi) Color.Black else Color(0xFF155C36)
+            Text("보안", style = MaterialTheme.typography.labelLarge, color = labelColor)
+            Text("성능", style = MaterialTheme.typography.labelLarge, color = if (controller.settings.monochromeUi) Color.Black else Color(0xFF7A3E00))
         }
         Slider(
             value = sliderValue,
@@ -470,7 +716,7 @@ private fun ModeSection(controller: AssistController) {
 private fun ModelSection(controller: AssistController) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Models", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        StatusPill(controller.localModelStatus, controller.settings.modelPath.isNotBlank())
+        StatusPill(controller.localModelStatus, controller.settings.modelPath.isNotBlank(), controller.settings.monochromeUi)
         OutlinedTextField(
             value = controller.settings.modelPath,
             onValueChange = controller::setModelPath,
@@ -572,9 +818,19 @@ private fun ApiSection(controller: AssistController) {
 }
 
 @Composable
-private fun StatusPill(text: String, positive: Boolean) {
-    val background = if (positive) Color(0xFFE0F2E9) else Color(0xFFFFF1D6)
-    val foreground = if (positive) Color(0xFF155C36) else Color(0xFF795000)
+private fun StatusPill(text: String, positive: Boolean, monochrome: Boolean) {
+    val background = when {
+        monochrome && positive -> Color.Black
+        monochrome -> Color.White
+        positive -> Color(0xFFE0F2E9)
+        else -> Color(0xFFFFF1D6)
+    }
+    val foreground = when {
+        monochrome && positive -> Color.White
+        monochrome -> Color.Black
+        positive -> Color(0xFF155C36)
+        else -> Color(0xFF795000)
+    }
     Surface(shape = RoundedCornerShape(8.dp), color = background, modifier = Modifier.fillMaxWidth()) {
         Text(
             text = text,
