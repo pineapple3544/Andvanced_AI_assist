@@ -1,0 +1,265 @@
+:root {
+  color-scheme: dark;
+  --bg: #050505;
+  --fg: #f7f7f2;
+  --muted: #b8b8b0;
+  --line: #2d2d2d;
+  --panel: #101010;
+  --accent: #e7e0c6;
+  --warn: #d9a06a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255,255,255,.045) 1px, transparent 1px),
+    var(--bg);
+  background-size: 56px 56px;
+  color: var(--fg);
+  font-family: Inter, "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+}
+
+.deck {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  gap: 28px;
+  padding: clamp(40px, 7vw, 96px);
+  opacity: 0;
+  transform: translateX(32px) scale(.985);
+  pointer-events: none;
+  transition: opacity 220ms ease, transform 260ms ease;
+}
+
+.slide::before {
+  content: attr(data-title);
+  position: absolute;
+  top: clamp(24px, 4vw, 42px);
+  left: clamp(28px, 5vw, 64px);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.slide::after {
+  content: "";
+  position: absolute;
+  right: clamp(28px, 5vw, 72px);
+  bottom: clamp(84px, 8vw, 112px);
+  width: min(32vw, 420px);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent));
+}
+
+.slide.is-active {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  pointer-events: auto;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: clamp(14px, 1.6vw, 20px);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  max-width: 1050px;
+  margin: 0;
+  line-height: 1.02;
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: clamp(64px, 12vw, 156px);
+}
+
+h2 {
+  font-size: clamp(42px, 7vw, 92px);
+}
+
+.lead {
+  max-width: 880px;
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(22px, 3vw, 38px);
+  line-height: 1.34;
+  font-weight: 600;
+}
+
+.big-list,
+.code-list {
+  display: grid;
+  gap: 18px;
+  max-width: 980px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.big-list li {
+  border-left: 5px solid var(--accent);
+  padding: 10px 0 10px 22px;
+  color: var(--fg);
+  font-size: clamp(24px, 3.4vw, 46px);
+  font-weight: 750;
+}
+
+.big-list.compact li {
+  font-size: clamp(22px, 2.8vw, 38px);
+}
+
+.flow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  width: min(100%, 1120px);
+}
+
+.flow div,
+.stack span,
+.code-list li {
+  min-height: 92px;
+  border: 1px solid var(--line);
+  background: rgba(16, 16, 16, .86);
+  display: grid;
+  align-items: center;
+  padding: 22px;
+}
+
+.flow div {
+  font-size: clamp(18px, 2vw, 28px);
+  font-weight: 800;
+}
+
+.stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  max-width: 980px;
+}
+
+.stack span {
+  min-height: auto;
+  padding: 14px 18px;
+  color: var(--fg);
+  font-size: clamp(18px, 2vw, 26px);
+  font-weight: 750;
+}
+
+.code-list li {
+  grid-template-columns: 180px 1fr;
+  gap: 18px;
+  min-height: 72px;
+}
+
+.code-list strong {
+  color: var(--accent);
+  font-size: clamp(22px, 2.4vw, 32px);
+}
+
+.code-list span {
+  color: var(--muted);
+  font-size: clamp(20px, 2.2vw, 30px);
+  font-weight: 650;
+}
+
+.signal-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  width: min(58vw, 720px);
+  margin-top: 18px;
+}
+
+.signal-grid span {
+  height: 8px;
+  background: var(--fg);
+}
+
+.signal-grid span:nth-child(2) {
+  background: var(--accent);
+}
+
+.signal-grid span:nth-child(3) {
+  background: var(--warn);
+}
+
+.controls {
+  position: fixed;
+  right: 28px;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
+}
+
+.nav-button {
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.nav-button:hover {
+  border-color: var(--accent);
+}
+
+.counter {
+  min-width: 72px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  body {
+    overflow: auto;
+  }
+
+  .deck {
+    min-height: 100vh;
+  }
+
+  .slide {
+    padding: 84px 24px 112px;
+  }
+
+  .flow {
+    grid-template-columns: 1fr;
+  }
+
+  .code-list li {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .controls {
+    right: 16px;
+    left: 16px;
+    justify-content: space-between;
+  }
+}
